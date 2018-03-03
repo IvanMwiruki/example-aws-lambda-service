@@ -1,0 +1,122 @@
+apply plugin: 'checkstyle'
+apply plugin: 'findbugs'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'java'
+apply plugin: 'jacoco'
+
+version = '1.0.0'
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'io.spring.gradle:dependency-management-plugin:1.0.0.RC2'
+    }
+}
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    compile (
+            'com.amazonaws:aws-java-sdk:1.11.221',
+            'com.amazonaws:aws-java-sdk-core:1.11.221',
+            'com.amazonaws:aws-java-sdk-s3:1.11.221',
+            'com.amazonaws:aws-java-sdk-dynamodb:1.11.221',
+            'com.amazonaws:aws-java-sdk-lambda:1.11.221',
+            'com.amazonaws:aws-lambda-java-core:1.1.0',
+            'com.amazonaws:aws-lambda-java-events:2.0.1',
+            'com.amazonaws:aws-lambda-java-log4j:1.0.0',
+
+            'com.fasterxml.jackson.core:jackson-core:2.8.5',
+            'com.fasterxml.jackson.core:jackson-databind:2.8.5',
+            'com.fasterxml.jackson.core:jackson-annotations:2.8.5',
+
+            'org.apache.commons:commons-collections4:4.0',
+            'com.google.guava:guava:21.0',
+            'org.apache.commons:commons-lang3:3.0',
+            'com.intellij:annotations:+@jar')
+
+    testCompile(
+            'junit:junit:4.12',
+            'org.mockito:mockito-core:1.10.19')
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'com.amazonaws:aws-java-sdk-bom:1.10.77'
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'src'
+        }
+        resources {
+            srcDirs 'resources'
+        }
+    }
+    test {
+        java {
+            srcDir 'tst'
+        }
+    }
+}
+
+tasks.withType(FindBugs) {
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+tasks.withType(Test) {
+    testLogging {
+        afterSuite {desc, result ->
+            if (!desc.parent) {
+                println("Tests run: ${result.testCount}, Failures: ${result.failedTestCount}, Skipped: ${result.skippedTestCount}")
+            }
+        }
+    }
+}
+
+checkstyle {
+    toolVersion = 8.1
+}
+
+// Task for building the zip file for upload
+task buildZip(type: Zip) {
+    baseName = "package"
+    version = ""
+    from compileJava
+    from processResources
+    into('lib') {
+        from configurations.runtime
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                minimum = 0.8
+            }
+        }
+        rule {
+            limit {
+                counter = 'BRANCH'
+                minimum = 0.8
+            }
+        }
+    }
+}
+
+build.dependsOn buildZip, jacocoTestCoverageVerification
+jacocoTestCoverageVerification.dependsOn jacocoTestReport
+jacocoTestReport.dependsOn test
